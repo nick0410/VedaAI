@@ -12,8 +12,23 @@ import groupsRouter from './routes/groups';
 async function main(): Promise<void> {
   await connectMongo();
 
+  const allowedOrigins = env.corsOrigin
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   const app = express();
-  app.use(cors({ origin: env.corsOrigin }));
+  app.use(
+    cors({
+      origin: (origin, cb) => {
+        // allow non-browser clients (curl, server-to-server) and matching origins
+        if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+        if (allowedOrigins.includes('*')) return cb(null, true);
+        return cb(new Error(`Origin ${origin} not allowed by CORS`));
+      },
+      credentials: true,
+    })
+  );
   app.use(express.json({ limit: '5mb' }));
 
   app.get('/api/health', (_req, res) => res.json({ ok: true }));

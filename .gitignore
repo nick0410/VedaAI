@@ -7,6 +7,7 @@ dist/
 build/
 coverage/
 .turbo/
+*.tsbuildinfo
 
 # secrets (do not commit any environment file)
 .env
@@ -21,7 +22,8 @@ Thumbs.db
 # user-only assets — design references kept locally
 figma_im/
 
-# editor
+# editor / local IDE state
 .vscode/
 .idea/
+.claude/
 

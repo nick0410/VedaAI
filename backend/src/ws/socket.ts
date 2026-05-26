@@ -5,8 +5,13 @@ import { env } from '../config/env';
 let io: IOServer | null = null;
 
 export function initSocket(server: HttpServer): IOServer {
+  const allowed = env.corsOrigin.split(',').map((o) => o.trim()).filter(Boolean);
   io = new IOServer(server, {
-    cors: { origin: env.corsOrigin, methods: ['GET', 'POST'] },
+    cors: {
+      origin: allowed.length === 1 && allowed[0] === '*' ? true : allowed,
+      methods: ['GET', 'POST'],
+      credentials: true,
+    },
   });
 
   io.on('connection', (socket) => {
