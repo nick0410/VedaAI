@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# build / cache
+.next/
+dist/
+build/
+coverage/
+.turbo/
+
+# secrets (do not commit any environment file)
+.env
+.env.*
+!.env.example
+
+# local artifacts
+*.log
+.DS_Store
+Thumbs.db
+
+# user-only assets — design references kept locally
+figma_im/
+
+# editor
+.vscode/
+.idea/
+
