@@ -5,7 +5,6 @@ dotenv.config();
 export const env = {
   port: Number(process.env.PORT ?? 4000),
   mongoUri: process.env.MONGO_URI ?? 'mongodb://localhost:27017/assessment_creator',
-  redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
   jwtSecret: process.env.JWT_SECRET ?? 'dev-only-change-me-' + Math.random().toString(36).slice(2),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',

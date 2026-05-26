@@ -103,7 +103,14 @@ export async function deleteAssignment(id: string): Promise<void> {
   await unwrap(res, 'Delete failed');
 }
 
-export async function createAssignment(formData: FormData): Promise<{ id: string; status: string }> {
+export interface CreateAssignmentResult {
+  id: string;
+  status: Assignment['status'];
+  paper?: Assignment['paper'];
+  error?: string;
+}
+
+export async function createAssignment(formData: FormData): Promise<CreateAssignmentResult> {
   const res = await apiFetch('/api/assignments', { method: 'POST', body: formData });
   return unwrap(res, 'Create failed');
 }
@@ -113,7 +120,7 @@ export async function getAssignment(id: string): Promise<Assignment> {
   return unwrap(res, 'Failed to load assignment');
 }
 
-export async function regenerateAssignment(id: string): Promise<{ id: string; status: string }> {
+export async function regenerateAssignment(id: string): Promise<CreateAssignmentResult> {
   const res = await apiFetch(`/api/assignments/${id}/regenerate`, { method: 'POST' });
   return unwrap(res, 'Regenerate failed');
 }

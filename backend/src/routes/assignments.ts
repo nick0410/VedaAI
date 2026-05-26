@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import { Assignment } from '../models/Assignment';
-import { enqueueGeneration } from '../queue/queue';
+import { generateForAssignment } from '../services/generate';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 
 const router = Router();
@@ -53,9 +53,10 @@ router.get('/', async (req: AuthedRequest, res: Response) => {
 
 router.post('/', upload.single('file'), async (req: AuthedRequest, res: Response) => {
   try {
-    const rawTypes = typeof req.body.questionTypes === 'string'
-      ? JSON.parse(req.body.questionTypes)
-      : req.body.questionTypes;
+    const rawTypes =
+      typeof req.body.questionTypes === 'string'
+        ? JSON.parse(req.body.questionTypes)
+        : req.body.questionTypes;
 
     const parsed = CreateBodySchema.safeParse({
       title: req.body.title,
@@ -81,9 +82,20 @@ router.post('/', upload.single('file'), async (req: AuthedRequest, res: Response
       status: 'queued',
     });
 
-    await enqueueGeneration(assignment.id);
-
-    return res.status(201).json({ id: assignment.id, status: assignment.status });
+    try {
+      const completed = await generateForAssignment(assignment.id);
+      return res.status(201).json({
+        id: completed.id,
+        status: completed.status,
+        paper: completed.paper,
+      });
+    } catch (e) {
+      return res.status(201).json({
+        id: assignment.id,
+        status: 'failed',
+        error: (e as Error).message,
+      });
+    }
   } catch (e) {
     console.error('[create assignment]', e);
     return res.status(500).json({ error: 'internal_error', message: (e as Error).message });
@@ -130,8 +142,16 @@ router.post('/:id/regenerate', async (req: AuthedRequest, res: Response) => {
     a.error = undefined;
     a.paper = undefined;
     await a.save();
-    await enqueueGeneration(a.id);
-    return res.json({ id: a.id, status: a.status });
+    try {
+      const completed = await generateForAssignment(a.id);
+      return res.json({
+        id: completed.id,
+        status: completed.status,
+        paper: completed.paper,
+      });
+    } catch (e) {
+      return res.json({ id: a.id, status: 'failed', error: (e as Error).message });
+    }
   } catch (e) {
     return res.status(500).json({ error: 'internal_error', message: (e as Error).message });
   }
@@ -157,18 +177,13 @@ async function extractText(file: Express.Multer.File): Promise<string> {
         .replace(/\r/g, '')
         .replace(/\n{3,}/g, '\n\n')
         .trim();
-      if (cleaned.length < 30) {
-        console.warn('[pdf-parse] extracted text too short — file may be image-only');
-        return '';
-      }
+      if (cleaned.length < 30) return '';
       return cleaned.slice(0, MAX_SOURCE_CHARS);
     } catch (e) {
       console.warn('[pdf-parse] failed:', (e as Error).message);
       return '';
     }
   }
-
-  // Unknown binary — don't pass garbage to the LLM
   return '';
 }
 

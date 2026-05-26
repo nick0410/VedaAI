@@ -6,7 +6,6 @@ import { useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAssignmentStore } from '@/store/assignmentStore';
 import { getAssignment, regenerateAssignment } from '@/lib/api';
-import { getSocket, subscribeToAssignment } from '@/lib/socket';
 import { QuestionPaper } from '@/components/QuestionPaper';
 import { AppShell } from '@/components/AppShell';
 import { downloadPaperPdf } from '@/lib/pdf';
@@ -22,6 +21,7 @@ export default function OutputPage() {
   const [downloading, setDownloading] = useState(false);
   const paperRef = useRef<HTMLDivElement>(null);
 
+  // Initial load — fetch the assignment unless the store already has a fresh paper.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -39,34 +39,18 @@ export default function OutputPage() {
     };
   }, [id, setCurrentAssignment, setStatus]);
 
-  useEffect(() => {
-    const socket = getSocket();
-    const unsub = subscribeToAssignment(id);
-
-    const onStatus = (payload: { status: Assignment['status']; error?: string }) => {
-      setStatus(payload.status, payload.error);
-    };
-    const onUpdate = (payload: { status: Assignment['status']; paper: Assignment['paper'] }) => {
-      if (payload.paper) setPaper(payload.paper);
-    };
-
-    socket.on('assignment:status', onStatus);
-    socket.on('assignment:update', onUpdate);
-
-    return () => {
-      socket.off('assignment:status', onStatus);
-      socket.off('assignment:update', onUpdate);
-      unsub();
-    };
-  }, [id, setStatus, setPaper]);
-
   async function onRegenerate() {
     if (regenerating) return;
     setRegenerating(true);
     clearPaper();
-    setStatus('queued');
+    setStatus('processing');
     try {
-      await regenerateAssignment(id);
+      const result = await regenerateAssignment(id);
+      if (result.paper) {
+        setPaper(result.paper);
+      } else if (result.error || result.status === 'failed') {
+        setStatus('failed', result.error ?? 'Regeneration failed');
+      }
     } catch (e) {
       setStatus('failed', (e as Error).message);
     } finally {
@@ -197,25 +181,16 @@ function GeneratingCard({
     );
   }
 
-  const stepText =
-    status === 'queued'
-      ? isRegen
-        ? 'Re-queuing your assignment…'
-        : 'Queued for generation…'
-      : isRegen
-      ? 'Generating a fresh version…'
-      : 'AI is drafting your paper…';
+  const stepText = isRegen ? 'Generating a fresh version…' : 'AI is drafting your paper…';
 
   return (
     <div className="surface relative overflow-hidden">
-      {/* Animated progress shimmer along the top */}
       <motion.div
         className="absolute top-0 left-0 h-0.5 bg-gradient-to-r from-transparent via-brand-500 to-transparent"
         initial={{ x: '-30%', width: '30%' }}
         animate={{ x: ['-30%', '120%'] }}
         transition={{ duration: 1.6, repeat: Infinity, ease: 'linear' }}
       />
-
       <div className="px-6 py-12 sm:py-16 flex flex-col items-center text-center">
         <div className="relative h-14 w-14 mb-5">
           <div className="absolute inset-0 rounded-full border-4 border-ink-200" />
@@ -223,16 +198,14 @@ function GeneratingCard({
         </div>
         <h2 className="text-base font-semibold mb-1">{stepText}</h2>
         <p className="text-sm text-ink-500 max-w-sm">
-          This usually takes a few seconds. Output is validated against a strict schema before it reaches your screen.
+          Usually takes 10–15 seconds. Output is validated against a strict schema before it reaches your screen.
         </p>
-
-        {/* Faux progress steps */}
-        <div className="mt-8 flex items-center gap-3 text-xs text-ink-500">
+        <div className="mt-8 flex items-center gap-3 text-xs text-ink-500 flex-wrap justify-center">
           <StepDot active label="Prompt" />
           <span className="h-px w-6 bg-ink-200" />
-          <StepDot active={status !== 'queued'} label="AI inference" pulse={status === 'processing'} />
+          <StepDot active pulse label="AI inference" />
           <span className="h-px w-6 bg-ink-200" />
-          <StepDot label="Validate schema" />
+          <StepDot active label="Validate schema" />
           <span className="h-px w-6 bg-ink-200" />
           <StepDot label="Render paper" />
         </div>

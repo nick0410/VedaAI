@@ -82,8 +82,14 @@ export function CreateAssignmentForm() {
       fd.append('questionTypes', JSON.stringify(draft.questionTypes));
       if (draft.file) fd.append('file', draft.file);
 
-      const { id } = await createAssignment(fd);
-      router.push(`/output/${id}`);
+      const result = await createAssignment(fd);
+      if (result.paper) {
+        useAssignmentStore.getState().setPaper(result.paper);
+      } else if (result.error) {
+        setErrors({ submit: result.error });
+        return;
+      }
+      router.push(`/output/${result.id}`);
     } catch (err) {
       setErrors({ submit: (err as Error).message });
     } finally {
@@ -273,7 +279,14 @@ export function CreateAssignmentForm() {
           ← Previous
         </Link>
         <button type="submit" className="btn-dark" disabled={submitting}>
-          {submitting ? 'Creating…' : 'Next →'}
+          {submitting ? (
+            <>
+              <span className="inline-block h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin mr-2" />
+              Generating paper… (~15s)
+            </>
+          ) : (
+            'Next →'
+          )}
         </button>
       </div>
     </form>
