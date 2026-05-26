@@ -7,6 +7,7 @@ dist/
 build/
 coverage/
 .turbo/
+.vercel/
 *.tsbuildinfo
 
 # secrets (do not commit any environment file)
